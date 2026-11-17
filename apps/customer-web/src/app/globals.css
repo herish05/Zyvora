@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f7f3ee;
+  --surface: #fffaf2;
+  --ink: #1b1b1b;
+  --muted: #5f5a52;
+  --brand: #a8742a;
+  --brand-deep: #7e5112;
+  --line: #e8dfd2;
+}
+
+body {
+  background:
+    radial-gradient(circle at 8% 10%, rgba(168, 116, 42, 0.15), transparent 35%),
+    radial-gradient(circle at 85% 90%, rgba(46, 52, 56, 0.12), transparent 40%),
+    var(--bg);
+  color: var(--ink);
+}
+
+.card-premium {
+  background: linear-gradient(180deg, #fffdf8 0%, #fff8ec 100%);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.glow-hover {
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.glow-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 40px rgba(27, 27, 27, 0.1);
+}

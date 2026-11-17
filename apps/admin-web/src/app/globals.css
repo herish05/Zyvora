@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --ink: #111827;
+  --muted: #5b6470;
+  --brand: #1f3a33;
+  --accent: #a8742a;
+  --line: #e5e7eb;
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(31, 58, 51, 0.05), transparent 35%),
+    radial-gradient(circle at 95% 8%, rgba(168, 116, 42, 0.12), transparent 20%),
+    var(--bg);
+  color: var(--ink);
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
