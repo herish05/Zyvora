@@ -5,7 +5,7 @@ services:
     plan: free
     autoDeploy: true
     healthCheckPath: /api/v1/health
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @zyvora/api build
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @zyvora/api build
     startCommand: pnpm --filter @zyvora/api start
     envVars:
       - key: NODE_ENV
