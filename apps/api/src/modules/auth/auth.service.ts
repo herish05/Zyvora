@@ -1,10 +1,18 @@
 import bcrypt from "bcryptjs";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { env } from "../../config/env.js";
 import { UserModel, type Role } from "./user.model.js";
-import type { BootstrapAdminInput, SigninInput, SignupInput } from "./auth.schemas.js";
+import type {
+  BootstrapAdminInput,
+  RequestSigninOtpInput,
+  SigninInput,
+  SignupInput,
+  VerifySigninOtpInput
+} from "./auth.schemas.js";
 import { SessionModel } from "./session.model.js";
+import { redisClient } from "../../config/redis.js";
+import { sendSigninOtpEmail } from "../../shared/mailer.js";
 
 type JwtTtl = `${number}${"ms" | "s" | "m" | "h" | "d" | "w" | "y"}`;
 
@@ -19,6 +27,16 @@ type RefreshTokenPayload = AuthTokenPayload & {
 };
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+const OTP_TTL_SECONDS = 5 * 60;
+const OTP_MAX_ATTEMPTS = 5;
+const OTP_REQUEST_COOLDOWN_SECONDS = 30;
+
+const otpKeyForEmail = (email: string) => `zyvora:otp:signin:${email}`;
+const otpRequestCooldownKeyForEmail = (email: string) => `zyvora:otp:signin:cooldown:${email}`;
+
+const hashOtpCode = (code: string) => createHash("sha256").update(code).digest("hex");
+
+const generateOtpCode = () => String(randomInt(0, 1_000_000)).padStart(6, "0");
 
 const buildAccessToken = (payload: AuthTokenPayload) =>
   jwt.sign(payload, env.JWT_ACCESS_SECRET, {
@@ -126,30 +144,103 @@ export const signin = async (input: SigninInput, context?: { userAgent?: string;
   };
 };
 
-export const findOrCreateGoogleUser = async (
-  profile: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  },
-  context?: { userAgent?: string; ipAddress?: string }
-) => {
-  let user = await UserModel.findOne({
-    $or: [{ googleId: profile.id }, { email: profile.email.toLowerCase() }]
-  });
+export const requestSigninOtp = async (input: RequestSigninOtpInput) => {
+  const email = input.email.toLowerCase();
+  const cooldownKey = otpRequestCooldownKeyForEmail(email);
+  const retryAfterSeconds = await redisClient.ttl(cooldownKey);
+
+  if (retryAfterSeconds > 0) {
+    throw new Error(`Please wait ${retryAfterSeconds} seconds before requesting another OTP`);
+  }
+
+  let user = await UserModel.findOne({ email });
 
   if (!user) {
+    const localPart = email.split("@")[0] || "customer";
     user = await UserModel.create({
-      email: profile.email.toLowerCase(),
-      firstName: profile.firstName,
-      lastName: profile.lastName,
+      email,
+      firstName: localPart,
+      lastName: "User",
       role: "customer",
-      googleId: profile.id,
-      emailVerified: true
+      emailVerified: false
     });
-  } else if (!user.googleId) {
-    user.googleId = profile.id;
+  }
+
+  if (user.role !== "customer") {
+    throw new Error("OTP sign-in is only available for customer accounts");
+  }
+
+  const otp = generateOtpCode();
+  const key = otpKeyForEmail(email);
+
+  await redisClient.setEx(
+    key,
+    OTP_TTL_SECONDS,
+    JSON.stringify({
+      userId: user._id.toString(),
+      otpHash: hashOtpCode(otp),
+      attempts: 0
+    })
+  );
+
+  await redisClient.setEx(cooldownKey, OTP_REQUEST_COOLDOWN_SECONDS, "1");
+
+  await sendSigninOtpEmail(email, otp, OTP_TTL_SECONDS);
+
+  return {
+    expiresInSeconds: OTP_TTL_SECONDS,
+    retryAfterSeconds: OTP_REQUEST_COOLDOWN_SECONDS
+  };
+};
+
+export const verifySigninOtp = async (
+  input: VerifySigninOtpInput,
+  context?: { userAgent?: string; ipAddress?: string }
+) => {
+  const email = input.email.toLowerCase();
+  const key = otpKeyForEmail(email);
+  const otpStateRaw = await redisClient.get(key);
+
+  if (!otpStateRaw) {
+    throw new Error("OTP expired or not requested");
+  }
+
+  const otpState = JSON.parse(otpStateRaw) as {
+    userId: string;
+    otpHash: string;
+    attempts: number;
+  };
+
+  if (hashOtpCode(input.otp) !== otpState.otpHash) {
+    const nextAttempts = otpState.attempts + 1;
+
+    if (nextAttempts >= OTP_MAX_ATTEMPTS) {
+      await redisClient.del(key);
+      throw new Error("Too many invalid OTP attempts. Please request a new code.");
+    }
+
+    const remainingTtl = await redisClient.ttl(key);
+    const ttlSeconds = remainingTtl > 0 ? remainingTtl : OTP_TTL_SECONDS;
+
+    await redisClient.setEx(
+      key,
+      ttlSeconds,
+      JSON.stringify({
+        ...otpState,
+        attempts: nextAttempts
+      })
+    );
+    throw new Error("Invalid OTP code");
+  }
+
+  await redisClient.del(key);
+
+  const user = await UserModel.findById(otpState.userId);
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  if (!user.emailVerified) {
     user.emailVerified = true;
     await user.save();
   }

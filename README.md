@@ -35,6 +35,10 @@ App URLs:
 - Google OAuth entry points:
   - `GET /api/v1/auth/google`
   - `GET /api/v1/auth/google/callback`
+- Google OAuth target routing:
+   - Customer: `GET /api/v1/auth/google?target=customer`
+   - Admin: `GET /api/v1/auth/google?target=admin`
+   - Admin target enforces role check at callback and rejects non-admin users.
 - Refresh token rotation:
    - `POST /api/v1/auth/refresh`
 - Signout with session revocation:
@@ -51,6 +55,54 @@ App URLs:
    - `GET /api/v1/business/profile`
    - `PUT /api/v1/business/profile`
    - Requires Bearer access token with `admin` role.
+
+## Catalog Foundation (Phase 4 start)
+
+- Public category discovery:
+   - `GET /api/v1/catalog/categories/public-tree`
+   - `GET /api/v1/catalog/categories/:slug/filters`
+- Admin category management:
+   - `GET /api/v1/catalog/admin/categories`
+   - `POST /api/v1/catalog/admin/categories`
+   - `PUT /api/v1/catalog/admin/categories/:id`
+- Admin attribute-definition management:
+   - `GET /api/v1/catalog/admin/attributes`
+   - `POST /api/v1/catalog/admin/attributes`
+   - `PUT /api/v1/catalog/admin/attributes/:id`
+   - All admin catalog endpoints require admin-role Bearer token.
+
+## Product and Inventory Foundation
+
+- Public product APIs:
+   - `GET /api/v1/public/products`
+   - `GET /api/v1/public/products/:slug`
+- Admin product APIs:
+   - `GET /api/v1/admin/products`
+   - `GET /api/v1/admin/products/:id`
+   - `POST /api/v1/admin/products`
+   - `PUT /api/v1/admin/products/:id`
+- Admin variant and inventory APIs:
+   - `POST /api/v1/admin/products/:id/variants`
+   - `PUT /api/v1/admin/variants/:id`
+   - `POST /api/v1/admin/variants/:id/inventory-adjustments`
+   - `PUT /api/v1/admin/variants/:id/low-stock-threshold`
+   - `GET /api/v1/admin/inventory/low-stock`
+   - All admin product and inventory endpoints require admin-role Bearer token.
+
+## Cart and Wishlist Foundation
+
+- Authenticated customer cart APIs:
+   - `GET /api/v1/cart`
+   - `POST /api/v1/cart/items`
+   - `PUT /api/v1/cart/items/:id`
+   - `DELETE /api/v1/cart/items/:id`
+- Authenticated customer wishlist APIs:
+   - `GET /api/v1/wishlist`
+   - `POST /api/v1/wishlist/items`
+   - `DELETE /api/v1/wishlist/items/:id`
+- Cart behavior:
+   - Backend validates stock and active variants on add/update.
+   - Totals are computed server-side in minor units.
 
 ## Status Tracking
 

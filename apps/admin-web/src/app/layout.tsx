@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Fraunces } from "next/font/google";
+import { AdminShell } from "./admin-shell";
 import "./globals.css";
 
 const display = Fraunces({
@@ -22,7 +23,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body style={{ fontFamily: "var(--font-body)" }}>{children}</body>
+      <body style={{ fontFamily: "var(--font-body)" }}>
+        <AdminShell>{children}</AdminShell>
+      </body>
     </html>
   );
 }

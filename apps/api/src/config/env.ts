@@ -14,10 +14,12 @@ const envSchema = z.object({
   JWT_REFRESH_TTL: z.string().default("30d"),
   CLIENT_WEB_URL: z.string().url(),
   ADMIN_WEB_URL: z.string().url(),
-  GOOGLE_CLIENT_ID: z.string().min(1),
-  GOOGLE_CLIENT_SECRET: z.string().min(1),
-  GOOGLE_CALLBACK_URL: z.string().url(),
-  ADMIN_BOOTSTRAP_KEY: z.string().optional()
+  ADMIN_BOOTSTRAP_KEY: z.string().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().email().optional()
 });
 
 export const env = envSchema.parse(process.env);
