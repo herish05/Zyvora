@@ -3,8 +3,8 @@ import { CustomerShell } from "./customer-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Zyvora | Premium Shopping",
-  description: "Zyvora premium storefront"
+  title: "Zyvora | Find your kind of beautiful",
+  description: "A thoughtful edit of bags, shoes and clothes to make everyday dressing feel a little more like you."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

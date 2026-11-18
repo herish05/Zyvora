@@ -1,16 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Star } from "lucide-react";
 import { mockProducts } from "../../lib/mock-catalog";
 import { upsertMockCartItem } from "../../lib/mock-cart";
 import { MOCK_WISHLIST_UPDATED_EVENT, readMockWishlistStorage, upsertMockWishlistItem } from "../../lib/mock-wishlist";
 import { AppToast, useAppToast } from "../../components/app-toast";
+import { announceCatalogCategory, readCatalogCategory } from "../../lib/catalog-navigation";
 
 const categoryTabs = ["all", "shoes", "shirts", "jeans", "purse"] as const;
 
 export default function ProductListingPage() {
+  return (
+    <Suspense fallback={<main className="mx-auto max-w-7xl px-4 pb-12 pt-6 sm:px-8"><p className="text-sm text-[#806c64]">Loading the collection...</p></main>}>
+      <ProductListingContent />
+    </Suspense>
+  );
+}
+
+function ProductListingContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedCategory = searchParams.get("category");
   const [activeCategory, setActiveCategory] = useState<(typeof categoryTabs)[number]>("all");
   const [searchText, setSearchText] = useState("");
   const [sortBy, setSortBy] = useState<"popular" | "price_low" | "price_high" | "rating">("popular");
@@ -51,6 +64,20 @@ export default function ProductListingPage() {
     }
     return map;
   }, []);
+
+  useEffect(() => {
+    const category = readCatalogCategory(requestedCategory);
+    setActiveCategory(category);
+    setPage(1);
+    announceCatalogCategory(category);
+  }, [requestedCategory]);
+
+  const selectCategory = (category: (typeof categoryTabs)[number]) => {
+    setActiveCategory(category);
+    setPage(1);
+    announceCatalogCategory(category);
+    router.replace(category === "all" ? "/products" : `/products?category=${category}`, { scroll: false });
+  };
 
   useEffect(() => {
     setMaxPriceMinor(priceCeiling);
@@ -226,8 +253,7 @@ export default function ProductListingPage() {
             key={category}
             type="button"
             onClick={() => {
-              setActiveCategory(category);
-              setPage(1);
+              selectCategory(category);
             }}
             className={`rounded-full px-4 py-2 text-sm ${
               activeCategory === category
@@ -252,7 +278,7 @@ export default function ProductListingPage() {
                 setSelectedBrands([]);
                 setMinRating(0);
                 setMaxPriceMinor(priceCeiling);
-                setActiveCategory("all");
+                selectCategory("all");
                 setPage(1);
               }}
             >
@@ -276,8 +302,7 @@ export default function ProductListingPage() {
                     key={`filter-${category}`}
                     type="button"
                     onClick={() => {
-                      setActiveCategory(category);
-                      setPage(1);
+                      selectCategory(category);
                     }}
                     className={`rounded-lg px-2 py-1 text-left ${
                       activeCategory === category ? "bg-[#162e36] text-white" : "bg-[#fff] text-[#2f2a24]"
