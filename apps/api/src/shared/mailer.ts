@@ -12,31 +12,36 @@ type MailInput = {
 const hasSmtpConfig = () =>
   Boolean(env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && env.SMTP_PASS && env.MAIL_FROM);
 
+// Never cache null — always rebuild if env vars appear after startup
 let transporter: Transporter | null = null;
 
 const getTransporter = () => {
-  if (transporter) {
-    return transporter;
-  }
-
   if (!hasSmtpConfig()) {
     return null;
   }
 
-  transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: Number(env.SMTP_PORT),
-    secure: Number(env.SMTP_PORT) === 465,
-    auth: {
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASS
-  },
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 10000
-  });
+  // Rebuild transporter if it hasn't been created yet
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: env.SMTP_HOST,
+      port: Number(env.SMTP_PORT),
+      secure: Number(env.SMTP_PORT) === 465,
+      auth: {
+        user: env.SMTP_USER,
+        pass: env.SMTP_PASS
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
+    });
 
-return transporter;
+    logger.info(
+      { host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER },
+      "SMTP transporter initialised"
+    );
+  }
+
+  return transporter;
 };
 
 export const sendMail = async (input: MailInput) => {

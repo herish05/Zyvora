@@ -12,6 +12,16 @@ const start = async () => {
     const port = Number(process.env.PORT) || env.API_PORT || 4000;
     app.listen(port, "0.0.0.0", () => {
       logger.info(`API listening on 0.0.0.0:${port}`);
+      logger.info(
+        {
+          smtpHost: env.SMTP_HOST ?? "NOT SET",
+          smtpPort: env.SMTP_PORT ?? "NOT SET",
+          smtpUser: env.SMTP_USER ?? "NOT SET",
+          smtpPassSet: Boolean(env.SMTP_PASS),
+          mailFrom: env.MAIL_FROM ?? "NOT SET"
+        },
+        "SMTP configuration status"
+      );
     });
   } catch (error) {
     logger.error({ error }, "Failed to start API");
