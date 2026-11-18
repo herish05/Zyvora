@@ -8,6 +8,7 @@ import { ensureCustomerProfileEmail, hasCustomerProfileSetup } from "../../lib/m
 type OtpRequestResponse = {
   expiresInSeconds: number;
   retryAfterSeconds: number;
+  demoOtp?: string;
 };
 
 function SignInForm() {
@@ -59,7 +60,12 @@ function SignInForm() {
       body: JSON.stringify({ email })
     });
 
-    setOtpHint("OTP sent to your email.");
+    if (result.data.demoOtp) {
+      setOtpHint(`Demo Mode (SMTP not configured): Your OTP is ${result.data.demoOtp}`);
+      setOtp(result.data.demoOtp);
+    } else {
+      setOtpHint("OTP sent to your email.");
+    }
 
     setResendIn(result.data.retryAfterSeconds || 30);
     setStep("verify");

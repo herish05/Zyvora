@@ -30,10 +30,13 @@ const getTransporter = () => {
     auth: {
       user: env.SMTP_USER,
       pass: env.SMTP_PASS
-    }
+  },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000
   });
 
-  return transporter;
+return transporter;
 };
 
 export const sendMail = async (input: MailInput) => {
@@ -51,11 +54,15 @@ export const sendMail = async (input: MailInput) => {
   });
 };
 
-export const sendSigninOtpEmail = async (email: string, otp: string, expiresInSeconds: number) => {
-  const expiresInMinutes = Math.floor(expiresInSeconds / 60);
-  const subject = "Your Zyvora sign-in OTP";
-  const text = `Your OTP is ${otp}. It will expire in ${expiresInMinutes} minutes.`;
-  const html = `
+  export const sendSigninOtpEmail = async (
+    email: string,
+    otp: string,
+    expiresInSeconds: number
+  ): Promise<{ delivered: boolean; demoOtp?: string }> => {
+    const expiresInMinutes = Math.floor(expiresInSeconds / 60);
+    const subject = "Your Zyvora sign-in OTP";
+    const text = `Your OTP is ${otp}. It will expire in ${expiresInMinutes} minutes.`;
+    const html = `
     <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
       <h2 style="margin: 0 0 12px;">Sign in to Zyvora</h2>
       <p style="margin: 0 0 12px;">Use this one-time password to continue:</p>
@@ -65,20 +72,26 @@ export const sendSigninOtpEmail = async (email: string, otp: string, expiresInSe
     </div>
   `;
 
-  try {
-    await sendMail({ to: email, subject, text, html });
-  } catch (error) {
-    if (env.NODE_ENV === "production") {
-      throw error;
+    if (!hasSmtpConfig()) {
+      logger.info(
+        { email, otp },
+        "SMTP credentials not configured in environment. Generated OTP for preview demo."
+      );
+      return { delivered: false, demoOtp: otp };
     }
 
-    logger.warn(
-      {
-        email,
-        otp,
-        error: error instanceof Error ? error.message : error
-      },
-      "SMTP not configured or email send failed. Using development OTP fallback log"
-    );
-  }
-};
+    try {
+      await sendMail({ to: email, subject, text, html });
+      return { delivered: true };
+    } catch (error) {
+      logger.warn(
+        {
+          email,
+          otp,
+          error: error instanceof Error ? error.message : error
+        },
+      "SMTP delivery failed. Falling back to demo OTP code."
+      );
+      return { delivered: false, demoOtp: otp };
+    }
+  };

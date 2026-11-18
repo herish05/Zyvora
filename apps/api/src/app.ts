@@ -15,6 +15,8 @@ import { commerceRouter } from "./modules/commerce/commerce.routes.js";
 
 export const app = express();
 
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger

@@ -185,11 +185,12 @@ export const requestSigninOtp = async (input: RequestSigninOtpInput) => {
 
   await redisClient.setEx(cooldownKey, OTP_REQUEST_COOLDOWN_SECONDS, "1");
 
-  await sendSigninOtpEmail(email, otp, OTP_TTL_SECONDS);
+  const mailResult = await sendSigninOtpEmail(email, otp, OTP_TTL_SECONDS);
 
   return {
     expiresInSeconds: OTP_TTL_SECONDS,
-    retryAfterSeconds: OTP_REQUEST_COOLDOWN_SECONDS
+    retryAfterSeconds: OTP_REQUEST_COOLDOWN_SECONDS,
+    ...(mailResult.demoOtp ? { demoOtp: mailResult.demoOtp } : {})
   };
 };
 
