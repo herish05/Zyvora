@@ -131,7 +131,7 @@ If creating a Web Service directly:
 - **Node Version**: 22 (read from `.node-version`).
 - **Build Command**:
   ```bash
-  corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile --prod=false && pnpm --filter @zyvora/api build
+  corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --no-frozen-lockfile --prod=false && pnpm --filter @zyvora/api build
   ```
 - **Start Command**:
   ```bash
