@@ -91,6 +91,15 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
   };
   const accountHref = isLoggedIn ? "/account/profile" : "/signin";
   const accountLabel = isLoggedIn ? (displayName ? `Hi, ${displayName}` : "Account") : "Sign in";
+  const mobileLinks: Array<{ label: string; href: string }> = [
+    { label: "Shop all", href: "/products" },
+    { label: "Bags", href: "/products?category=purse" },
+    { label: "Shoes", href: "/products?category=shoes" },
+    { label: "Clothing", href: "/products?category=shirts" },
+    { label: "Wishlist", href: "/wishlist" },
+    { label: accountLabel, href: accountHref },
+    { label: "Shopping bag", href: "/cart" }
+  ];
 
   return (
     <div className="min-h-screen">
@@ -127,7 +136,7 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
           <div className="mb-7 flex items-center justify-between"><Link href="/" className="font-display text-2xl tracking-[0.08em] text-[#392623]">ZYVORA</Link><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3e8e1] text-[#493530]"><X size={19} /></button></div>
           <p className="mb-3 text-[9px] font-semibold uppercase tracking-[0.23em] text-[#a45f61]">Find your next favourite</p>
           <nav className="grid" aria-label="Mobile navigation">
-            {[["Shop all", "/products"], ["Bags", "/products?category=purse"], ["Shoes", "/products?category=shoes"], ["Clothing", "/products?category=shirts"], ["Wishlist", "/wishlist"], [accountLabel, accountHref], ["Shopping bag", "/cart"]].map(([label, href]) => <Link key={label} href={href} className="mobile-menu-link">{label}{label === "Wishlist" && wishlistCount > 0 ? <span className="menu-count">{wishlistCount}</span> : null}{label === "Shopping bag" && cartCount > 0 ? <span className="menu-count">{cartCount}</span> : null}</Link>)}
+            {mobileLinks.map(({ label, href }) => <Link key={label} href={href} className="mobile-menu-link">{label}{label === "Wishlist" && wishlistCount > 0 ? <span className="menu-count">{wishlistCount}</span> : null}{label === "Shopping bag" && cartCount > 0 ? <span className="menu-count">{cartCount}</span> : null}</Link>)}
           </nav>
           <div className="mt-8 rounded-2xl bg-[#f3e5dd] p-5"><p className="font-display text-2xl text-[#513a35]">A little more you.</p><p className="mt-2 text-xs leading-5 text-[#806a62]">Pieces to make getting dressed feel lovely.</p></div>
         </aside>
