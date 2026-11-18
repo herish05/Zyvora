@@ -7,9 +7,17 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "build:api": "pnpm --filter @zyvora/api build",
+    "start:api": "node apps/api/dist/server.js",
+    "build:customer": "pnpm --filter @zyvora/customer-web build",
+    "build:admin": "pnpm --filter @zyvora/admin-web build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test"

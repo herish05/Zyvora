@@ -21,9 +21,29 @@ app.use(
   })
 );
 
+const allowedOrigins = [
+  env.CLIENT_WEB_URL,
+  env.ADMIN_WEB_URL,
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : [])
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: [env.CLIENT_WEB_URL, env.ADMIN_WEB_URL],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server, Render health check)
+      if (!origin) {
+        return callback(null, true);
+      }
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith(".vercel.app") ||
+        /^http:\/\/localhost:\d+$/.test(origin) ||
+        /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked origin: ${origin}`));
+    },
     credentials: true
   })
 );

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function AdminAuthCallbackPage() {
+function AdminAuthCallbackContent() {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -20,4 +20,12 @@ export default function AdminAuthCallbackPage() {
   }, [params, router]);
 
   return <main className="mx-auto max-w-3xl px-4 py-16">Finalizing admin sign in...</main>;
+}
+
+export default function AdminAuthCallbackPage() {
+  return (
+    <Suspense fallback={<main className="mx-auto max-w-3xl px-4 py-16">Finalizing admin sign in...</main>}>
+      <AdminAuthCallbackContent />
+    </Suspense>
+  );
 }

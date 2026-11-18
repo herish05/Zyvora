@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -18,4 +18,12 @@ export default function AuthCallbackPage() {
   }, [params, router]);
 
   return <main className="mx-auto max-w-3xl px-4 py-16">Finalizing sign in...</main>;
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<main className="mx-auto max-w-3xl px-4 py-16">Finalizing sign in...</main>}>
+      <AuthCallbackContent />
+    </Suspense>
+  );
 }

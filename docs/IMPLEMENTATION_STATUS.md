@@ -60,6 +60,16 @@ Last updated: 2026-11-17
    - Backend wishlist module with published-product validation
    - Customer storefront signin/signup forms wired to backend auth
    - Customer cart, wishlist, and account screens wired to live APIs
+13. Cloud deployment and build resilience (Render & Vercel):
+   - Fixed Render backend build pipeline: activated Corepack for pnpm 9.15.4 and added `node apps/api/dist/server.js` startup runner.
+   - Fixed missing `typescript` in `apps/api/package.json` devDependencies for isolated subpackage builds.
+   - Enabled multi-platform monorepo recognition with `"workspaces"` in root `package.json` and explicit build scripts.
+   - Added `0.0.0.0` network interface binding and `PORT || API_PORT` fallbacks in backend server.
+   - Added in-memory fallback for Redis in `apps/api/src/config/redis.ts` so free-tier deployments without Redis add-ons do not crash the service.
+   - Made CORS dynamic to accept Vercel preview domains (`*.vercel.app`), local environments, and configured client origins.
+   - Fixed Vercel monorepo install/build commands in `apps/customer-web/vercel.json` and `apps/admin-web/vercel.json`.
+   - Wrapped Next.js `useSearchParams()` hooks in `<Suspense>` boundaries to avoid static generation bailouts.
+   - Decoupled font loading from build-time network dependencies with preconnect CDN links and CSS variable fallbacks.
 
 ## Pending critical items
 

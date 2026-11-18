@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { customerApiRequest, ensureActiveCustomerToken, setStoredCustomerToken } from "../../lib/api";
 import { ensureCustomerProfileEmail, hasCustomerProfileSetup } from "../../lib/mock-account";
@@ -10,7 +10,7 @@ type OtpRequestResponse = {
   retryAfterSeconds: number;
 };
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -179,5 +179,13 @@ export default function SignInPage() {
         {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
       </section>
     </main>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<main className="mx-auto max-w-md px-4 py-16 text-center text-sm text-[#5f5a52]">Loading sign in...</main>}>
+      <SignInForm />
+    </Suspense>
   );
 }

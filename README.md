@@ -108,6 +108,49 @@ App URLs:
 
 Implementation phases and progress are maintained in `docs/IMPLEMENTATION_STATUS.md`.
 
+## Deployment Guide
+
+### 1. Deploying Backend (`apps/api`) to Render (Free Tier)
+
+#### Option A: Blueprint (Recommended)
+1. Go to **Render Dashboard** -> **New** -> **Blueprint**.
+2. Connect this repository. Render automatically reads `render.yaml`.
+3. Fill in required environment secrets:
+   - `MONGODB_URI`: Your MongoDB Atlas connection string (`mongodb+srv://...`). Make sure Atlas Network Access allows `0.0.0.0/0`.
+   - `JWT_ACCESS_SECRET`: Random 32+ character string.
+   - `JWT_REFRESH_SECRET`: Random 32+ character string.
+   - `CLIENT_WEB_URL`: Your Vercel frontend URL (or leave default for local).
+   - `ADMIN_WEB_URL`: Your Vercel admin URL (or leave default for local).
+   - `REDIS_URL`: Optional. If not provided or if free Redis is unavailable, the API seamlessly operates using an in-memory cache fallback.
+4. Click **Apply**.
+
+#### Option B: Manual Web Service
+If creating a Web Service directly:
+- **Root Directory**: Leave EMPTY (anchored at repository root).
+- **Environment**: Node.
+- **Node Version**: 22 (read from `.node-version`).
+- **Build Command**:
+  ```bash
+  corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile --prod=false && pnpm --filter @zyvora/api build
+  ```
+- **Start Command**:
+  ```bash
+  node apps/api/dist/server.js
+  ```
+- **Health Check Path**: `/api/v1/health`
+
+### 2. Deploying Storefront (`apps/customer-web`) to Vercel
+
+1. In **Vercel**, import this GitHub repository.
+2. In **Project Settings**:
+   - **Framework Preset**: Next.js
+   - **Root Directory**: `apps/customer-web`
+   - **Include source files outside Root Directory**: Checked (ON)
+3. Set Environment Variables:
+   - `NEXT_PUBLIC_API_BASE_URL`: `https://<your-render-api-name>.onrender.com/api/v1`
+   - `NEXT_PUBLIC_BRAND_NAME`: `Zyvora`
+4. Deploy. `apps/customer-web/vercel.json` automatically orchestrates the monorepo root installation and builds only the customer storefront.
+
 ## Current Scope
 
 This baseline includes architecture, monorepo setup, initial premium screen set for design review, and foundational auth APIs. Full commerce domain modules (catalog, cart, checkout, orders, inventory, CMS, moderation, analytics) are tracked for subsequent phases.

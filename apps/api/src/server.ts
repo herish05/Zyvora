@@ -9,8 +9,9 @@ const start = async () => {
     await connectDatabase();
     await connectRedis();
 
-    app.listen(env.API_PORT, () => {
-      logger.info(`API listening on port ${env.API_PORT}`);
+    const port = Number(process.env.PORT) || env.API_PORT || 4000;
+    app.listen(port, "0.0.0.0", () => {
+      logger.info(`API listening on 0.0.0.0:${port}`);
     });
   } catch (error) {
     logger.error({ error }, "Failed to start API");

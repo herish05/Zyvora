@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CustomerProfile, readCustomerProfile, writeCustomerProfile } from "../../../lib/mock-account";
 
-export default function AccountProfilePage() {
+function AccountProfileContent() {
   const searchParams = useSearchParams();
   const showSetupHint = searchParams.get("setup") === "1";
   const [profile, setProfile] = useState<CustomerProfile>(readCustomerProfile());
@@ -73,5 +73,13 @@ export default function AccountProfilePage() {
       </form>
       {saved ? <p className="mt-3 text-sm text-[#1e5a39]">Profile updated.</p> : null}
     </div>
+  );
+}
+
+export default function AccountProfilePage() {
+  return (
+    <Suspense fallback={<div className="card-premium p-6 sm:p-7">Loading profile...</div>}>
+      <AccountProfileContent />
+    </Suspense>
   );
 }
