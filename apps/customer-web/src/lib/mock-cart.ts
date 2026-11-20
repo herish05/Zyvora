@@ -1,4 +1,4 @@
-import { mockProducts } from "./mock-catalog";
+import { mockProducts, type MockProduct } from "./mock-catalog";
 
 export type MockCartStorageItem = {
   slug: string;
@@ -70,10 +70,10 @@ export const upsertMockCartItem = (slug: string, variantId: string, quantity = 1
   return existing;
 };
 
-export const buildMockCartView = (items: MockCartStorageItem[]): { items: MockCartViewItem[]; totals: MockCartTotals } => {
+export const buildMockCartView = (items: MockCartStorageItem[], products: MockProduct[] = mockProducts): { items: MockCartViewItem[]; totals: MockCartTotals } => {
   const enrichedItems: MockCartViewItem[] = items
     .map((item) => {
-      const product = mockProducts.find((candidate) => candidate.slug === item.slug);
+      const product = products.find((candidate) => candidate.slug === item.slug);
       if (!product) return null;
 
       const variant = product.variants.find((candidate) => candidate.id === item.variantId);
@@ -98,8 +98,8 @@ export const buildMockCartView = (items: MockCartStorageItem[]): { items: MockCa
     .filter((item): item is MockCartViewItem => Boolean(item));
 
   const subtotalMinor = enrichedItems.reduce((sum, item) => sum + item.lineSubtotalMinor, 0);
-  const shippingMinor = subtotalMinor > 0 ? 49900 : 0;
-  const taxMinor = Math.round(subtotalMinor * 0.18);
+  const shippingMinor = 0;
+  const taxMinor = 0;
 
   return {
     items: enrichedItems,

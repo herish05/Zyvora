@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { createHash } from "node:crypto";
+import { env } from "../../config/env.js";
 import { failure, success } from "../../shared/api-response.js";
 import { requireAuth, requireRoles } from "../auth/auth.middleware.js";
 import {
@@ -16,6 +18,7 @@ import {
   adjustVariantInventory,
   createProduct,
   createVariant,
+  deleteProduct,
   getAdminProduct,
   getPublicProductBySlug,
   listAdminProducts,
@@ -27,6 +30,28 @@ import {
 } from "./product.service.js";
 
 const productRouter = Router();
+
+productRouter.post("/admin/media/signature", requireAuth, requireRoles("admin"), (req, res) => {
+  const { CLOUDINARY_CLOUD_NAME: cloudName, CLOUDINARY_API_KEY: apiKey, CLOUDINARY_API_SECRET: apiSecret } = env;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    res.status(503).json(failure("Product media uploads are not configured"));
+    return;
+  }
+
+  const kind = req.body?.kind ?? "products";
+  if (kind !== "products" && kind !== "categories") {
+    res.status(400).json(failure("Invalid media destination"));
+    return;
+  }
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = `zyvora/${kind}`;
+  const signature = createHash("sha1")
+    .update(`folder=${folder}&timestamp=${timestamp}${apiSecret}`)
+    .digest("hex");
+
+  res.json(success("Upload signature created", { cloudName, apiKey, timestamp, folder, signature }));
+});
 
 productRouter.get("/public/products", async (req, res) => {
   try {
@@ -81,6 +106,16 @@ productRouter.put("/admin/products/:id", requireAuth, requireRoles("admin"), asy
     res.json(success("Product updated", product));
   } catch (error) {
     res.status(400).json(failure("Product update failed", error));
+  }
+});
+
+productRouter.delete("/admin/products/:id", requireAuth, requireRoles("admin"), async (req, res) => {
+  try {
+    const { id } = idParamSchema.parse(req.params);
+    const result = await deleteProduct(id);
+    res.json(success("Product deleted", result));
+  } catch (error) {
+    res.status(400).json(failure("Product deletion failed", error));
   }
 });
 

@@ -1,16 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { getMockProductBySlug } from "../../lib/mock-catalog";
+import { useEffect, useMemo, useState } from "react";
+import { getMockProductBySlug, mockProducts, type MockProduct } from "../../lib/mock-catalog";
 import { buildMockWishlistView, readMockWishlistStorage, removeMockWishlistItem, writeMockWishlistStorage } from "../../lib/mock-wishlist";
 import { readMockCartStorage, writeMockCartStorage } from "../../lib/mock-cart";
 import { AppToast, useAppToast } from "../../components/app-toast";
+import { getStorefrontProducts } from "../../lib/storefront-catalog";
 
 export default function WishlistPage() {
   const [wishlistStorage, setWishlistStorage] = useState(readMockWishlistStorage());
+  const [catalogProducts, setCatalogProducts] = useState<MockProduct[]>(process.env.NODE_ENV === "production" ? [] : mockProducts);
   const { toast, showToast, hideToast } = useAppToast();
-  const wishlistItems = useMemo(() => buildMockWishlistView(wishlistStorage), [wishlistStorage]);
+  const wishlistItems = useMemo(() => buildMockWishlistView(wishlistStorage, catalogProducts), [wishlistStorage, catalogProducts]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    getStorefrontProducts().then((products) => {
+      if (isCurrent) setCatalogProducts(products ?? (process.env.NODE_ENV === "production" ? [] : mockProducts));
+    });
+    return () => { isCurrent = false; };
+  }, []);
 
   const removeItem = (slug: string) => {
     const removedItem = wishlistStorage.find((item) => item.slug === slug) ?? null;
@@ -37,7 +47,7 @@ export default function WishlistPage() {
   };
 
   const moveToCart = (slug: string) => {
-    const product = getMockProductBySlug(slug);
+    const product = catalogProducts.find((candidate) => candidate.slug === slug) ?? getMockProductBySlug(slug);
     const variantId = product?.variants.at(0)?.id;
     if (!variantId) return;
 

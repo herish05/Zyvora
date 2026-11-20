@@ -1,9 +1,9 @@
-export type CatalogCategory = "all" | "shoes" | "shirts" | "jeans" | "purse";
+export type CatalogCategory = string;
 
 export const CATALOG_CATEGORY_CHANGED_EVENT = "zyvora:catalog-category-changed";
 
 export const readCatalogCategory = (value: string | null): CatalogCategory =>
-  value === "shoes" || value === "shirts" || value === "jeans" || value === "purse" ? value : "all";
+  value?.trim() || "all";
 
 export const announceCatalogCategory = (category: CatalogCategory) => {
   if (typeof window !== "undefined") {

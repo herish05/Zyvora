@@ -28,6 +28,8 @@ export const createProductSchema = z.object({
   tags: z.array(z.string().min(1).max(40)).max(50).default([]),
   categoryIds: z.array(objectIdSchema).min(1),
   publicationStatus: z.enum(publicationStatuses).default("draft"),
+  isOutOfStock: z.boolean().default(false),
+  isBestSeller: z.boolean().default(false),
   scheduledAt: z.coerce.date().optional(),
   seoTitle: z.string().max(160).optional(),
   seoDescription: z.string().max(320).optional(),

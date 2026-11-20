@@ -82,12 +82,14 @@ App URLs:
    - `POST /api/v1/admin/products`
    - `PUT /api/v1/admin/products/:id`
 - Admin variant and inventory APIs:
+   - `POST /api/v1/admin/media/signature` (admin only; signs a Cloudinary upload)
    - `POST /api/v1/admin/products/:id/variants`
    - `PUT /api/v1/admin/variants/:id`
    - `POST /api/v1/admin/variants/:id/inventory-adjustments`
    - `PUT /api/v1/admin/variants/:id/low-stock-threshold`
    - `GET /api/v1/admin/inventory/low-stock`
    - All admin product and inventory endpoints require admin-role Bearer token.
+- Product media uploads require `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` on the API service. The API secret stays server-side; uploaded media URLs are saved with the product variant.
 
 ## Cart and Wishlist Foundation
 
@@ -103,6 +105,17 @@ App URLs:
 - Cart behavior:
    - Backend validates stock and active variants on add/update.
    - Totals are computed server-side in minor units.
+
+## Orders and Fulfillment
+
+- Customer order endpoints (customer-role Bearer token):
+   - `POST /api/v1/orders` creates a cash-on-delivery order from available product variants and reserves inventory.
+   - `GET /api/v1/orders` returns the signed-in customer's orders.
+- Admin fulfillment endpoints (admin-role Bearer token):
+   - `GET /api/v1/admin/orders`
+   - `PUT /api/v1/admin/orders/:id` updates fulfillment status, payment collection status, and tracking number.
+- Fulfillment progresses through new, confirmed, packing, shipped, out for delivery, delivered, or cancelled. Cancelling before shipment restores stock.
+- Online payments and configurable shipping/tax rates are not connected; the current checkout supports cash on delivery with no shipping charge.
 
 ## Status Tracking
 
@@ -122,6 +135,7 @@ Implementation phases and progress are maintained in `docs/IMPLEMENTATION_STATUS
    - `CLIENT_WEB_URL`: Your Vercel frontend URL (or leave default for local).
    - `ADMIN_WEB_URL`: Your Vercel admin URL (or leave default for local).
    - `REDIS_URL`: Optional. If not provided or if free Redis is unavailable, the API seamlessly operates using an in-memory cache fallback.
+   - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`: Required for admin product photo and video uploads. Create these in Cloudinary and set them on the API service only.
 4. Click **Apply**.
 
 #### Option B: Manual Web Service
@@ -153,4 +167,4 @@ If creating a Web Service directly:
 
 ## Current Scope
 
-This baseline includes architecture, monorepo setup, initial premium screen set for design review, and foundational auth APIs. Full commerce domain modules (catalog, cart, checkout, orders, inventory, CMS, moderation, analytics) are tracked for subsequent phases.
+The platform includes product catalog, inventory, media upload signing, customer checkout for cash-on-delivery orders, and basic fulfillment status management. Online payments, shipping/tax configuration, returns, and customer order notifications are not connected yet.

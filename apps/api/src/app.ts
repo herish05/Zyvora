@@ -12,6 +12,7 @@ import { authRouter } from "./modules/auth/auth.routes.js";
 import { catalogRouter } from "./modules/catalog/catalog.routes.js";
 import { productRouter } from "./modules/products/product.routes.js";
 import { commerceRouter } from "./modules/commerce/commerce.routes.js";
+import { orderRouter } from "./modules/orders/order.routes.js";
 
 export const app = express();
 
@@ -67,6 +68,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/catalog", catalogRouter);
 app.use("/api/v1", productRouter);
 app.use("/api/v1", commerceRouter);
+app.use("/api/v1", orderRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error({ error }, "Unhandled API error");

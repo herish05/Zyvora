@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowDown, ArrowRight, ArrowUpRight, Heart, ShieldCheck, Sparkles, Truck } from "lucide-react";
 import { mockProducts } from "../lib/mock-catalog";
+import { getStorefrontProducts } from "../lib/storefront-catalog";
 
 const collections = [
   {
@@ -37,8 +38,9 @@ const reveal = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1] } }
 };
 
-export default function HomePage() {
-  const featured = mockProducts.find((product) => product.category === "purse") ?? mockProducts[0];
+export default async function HomePage() {
+  const catalogProducts = await getStorefrontProducts() ?? (process.env.NODE_ENV === "production" ? [] : mockProducts);
+  const featured = catalogProducts.find((product) => product.category === "purse" || product.categorySlug === "purse") ?? catalogProducts[0];
 
   return (
     <main className="overflow-hidden pb-20">
@@ -135,20 +137,22 @@ export default function HomePage() {
           <Link href="/products" className="mb-1 inline-flex items-center gap-2 text-xs font-semibold text-[#765f59] transition hover:text-[#a45f61] sm:text-sm">Shop everything <ArrowRight size={15} /></Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-          {mockProducts.map((product, index) => {
+          {catalogProducts.map((product, index) => {
             const variant = product.variants[0];
             return (
               <motion.div key={product.id} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }} transition={{ duration: 0.5, delay: index * 0.08 }}>
                 <Link href={`/products/${product.slug}`} className="product-tile group block">
                   <div className="relative aspect-[0.82] overflow-hidden rounded-2xl bg-[#eee4dd] sm:rounded-[1.4rem]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={product.images[0]} alt={product.name} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                    {product.images[0] ? <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={product.images[0]} alt={product.name} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                    </> : <span className="flex h-full items-center justify-center text-xs text-[#9b8076]">Product photo</span>}
                     <span className="absolute left-3 top-3 rounded-full bg-[#fffaf6]/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-[#795b52] backdrop-blur">{index === 0 ? "Loved" : "Just right"}</span>
                     <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#513a35] shadow-sm transition group-hover:bg-[#382421] group-hover:text-white"><ArrowUpRight size={16} /></span>
                   </div>
                   <div className="px-1 pt-3 sm:px-2 sm:pt-4">
                     <p className="text-[9px] uppercase tracking-[0.18em] text-[#a45f61] sm:text-[10px]">{product.brand}</p>
-                    <div className="mt-1 flex items-start justify-between gap-2"><h3 className="font-medium text-[#382421] sm:text-[15px]">{product.name}</h3><span className="shrink-0 text-[10px] text-[#9a8178]">★ {product.rating}</span></div>
+                    <div className="mt-1 flex items-start justify-between gap-2"><h3 className="font-medium text-[#382421] sm:text-[15px]">{product.name}</h3>{product.reviewCount > 0 ? <span className="shrink-0 text-[10px] text-[#9a8178]">★ {product.rating}</span> : null}</div>
                     <p className="mt-1.5 text-sm font-semibold text-[#382421]">₹{((variant?.priceMinor ?? 0) / 100).toLocaleString("en-IN")}</p>
                   </div>
                 </Link>

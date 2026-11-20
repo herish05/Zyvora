@@ -1,4 +1,4 @@
-import { mockProducts } from "./mock-catalog";
+import { mockProducts, type MockProduct } from "./mock-catalog";
 
 export type MockWishlistStorageItem = {
   slug: string;
@@ -9,7 +9,7 @@ export type MockWishlistViewItem = {
   slug: string;
   name: string;
   brand: string;
-  category: "shoes" | "shirts" | "jeans" | "purse";
+  category: string;
   image: string;
   priceMinor: number;
   rating: number;
@@ -78,11 +78,11 @@ export const toggleMockWishlistItem = (slug: string) => {
   return true;
 };
 
-export const buildMockWishlistView = (items: MockWishlistStorageItem[]): MockWishlistViewItem[] => {
+export const buildMockWishlistView = (items: MockWishlistStorageItem[], products: MockProduct[] = mockProducts): MockWishlistViewItem[] => {
   const view: MockWishlistViewItem[] = [];
 
   for (const item of items) {
-    const product = mockProducts.find((candidate) => candidate.slug === item.slug);
+    const product = products.find((candidate) => candidate.slug === item.slug);
     if (!product) {
       continue;
     }

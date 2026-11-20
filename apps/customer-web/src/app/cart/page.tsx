@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { buildMockCartView, MockCartStorageItem, readMockCartStorage, writeMockCartStorage } from "../../lib/mock-cart";
 import { AppToast, useAppToast } from "../../components/app-toast";
+import { mockProducts, type MockProduct } from "../../lib/mock-catalog";
+import { getStorefrontProducts } from "../../lib/storefront-catalog";
 
 const formatMinor = (amountMinor: number, currency: string) => {
   const amount = amountMinor / 100;
@@ -12,6 +14,7 @@ const formatMinor = (amountMinor: number, currency: string) => {
 
 export default function CartPage() {
   const [storageItems, setStorageItems] = useState(readMockCartStorage());
+  const [catalogProducts, setCatalogProducts] = useState<MockProduct[]>(process.env.NODE_ENV === "production" ? [] : mockProducts);
   const [isCartLoading, setIsCartLoading] = useState(true);
   const { toast, showToast, hideToast } = useAppToast();
 
@@ -27,7 +30,15 @@ export default function CartPage() {
     };
   }, []);
 
-  const cart = useMemo(() => buildMockCartView(storageItems), [storageItems]);
+  useEffect(() => {
+    let isCurrent = true;
+    getStorefrontProducts().then((products) => {
+      if (isCurrent) setCatalogProducts(products ?? (process.env.NODE_ENV === "production" ? [] : mockProducts));
+    });
+    return () => { isCurrent = false; };
+  }, []);
+
+  const cart = useMemo(() => buildMockCartView(storageItems, catalogProducts), [storageItems, catalogProducts]);
 
   const changeQuantity = (key: string, quantity: number) => {
     const safeQuantity = Math.max(1, quantity);

@@ -113,6 +113,8 @@ export const createProduct = async (input: CreateProductInput) => {
     tags: input.tags,
     categoryIds: input.categoryIds.map(toObjectId),
     publicationStatus,
+    isOutOfStock: input.isOutOfStock,
+    isBestSeller: input.isBestSeller,
     publishedAt: publicationStatus === "published" ? now : undefined,
     scheduledAt: publicationStatus === "scheduled" ? input.scheduledAt : undefined,
     seoTitle: normalizeOptional(input.seoTitle),
@@ -162,6 +164,9 @@ export const updateProduct = async (id: string, input: UpdateProductInput) => {
     product.tags = input.tags;
   }
 
+  if (typeof input.isOutOfStock === "boolean") product.isOutOfStock = input.isOutOfStock;
+  if (typeof input.isBestSeller === "boolean") product.isBestSeller = input.isBestSeller;
+
   if (input.attributeValues) {
     product.attributeValues = input.attributeValues;
   }
@@ -201,6 +206,20 @@ export const updateProduct = async (id: string, input: UpdateProductInput) => {
 
 export const listAdminProducts = async () =>
   ProductModel.find({}).sort({ updatedAt: -1 }).lean();
+
+export const deleteProduct = async (id: string) => {
+  const product = await ProductModel.findById(id).lean();
+  if (!product) throw new Error("Product not found");
+  const variants = await ProductVariantModel.find({ productId: product._id }).select("_id").lean();
+  const variantIds = variants.map((variant) => variant._id);
+  await Promise.all([
+    InventoryMovementModel.deleteMany({ variantId: { $in: variantIds } }),
+    InventoryModel.deleteMany({ variantId: { $in: variantIds } }),
+    ProductVariantModel.deleteMany({ _id: { $in: variantIds } })
+  ]);
+  await ProductModel.deleteOne({ _id: product._id });
+  return { id };
+};
 
 export const getAdminProduct = async (id: string) => {
   const product = await ProductModel.findById(id).lean();
@@ -437,12 +456,24 @@ export const listPublicProducts = async (query: {
       };
     }
 
-    filter.categoryIds = category._id;
+    const visibleCategories = await CategoryModel.find({ isVisible: true }).select("_id parentCategoryId").lean();
+    const includedIds = new Set([category._id.toString()]);
+    let expanded = true;
+    while (expanded) {
+      expanded = false;
+      for (const child of visibleCategories) {
+        if (child.parentCategoryId && includedIds.has(child.parentCategoryId.toString()) && !includedIds.has(child._id.toString())) {
+          includedIds.add(child._id.toString());
+          expanded = true;
+        }
+      }
+    }
+    filter.categoryIds = { $in: [...includedIds].map(toObjectId) };
   }
 
   const skip = (query.page - 1) * query.limit;
 
-  const [total, items] = await Promise.all([
+  const [total, products] = await Promise.all([
     ProductModel.countDocuments(filter),
     ProductModel.find(filter)
       .sort({ publishedAt: -1, _id: -1 })
@@ -450,6 +481,36 @@ export const listPublicProducts = async (query: {
       .limit(query.limit)
       .lean()
   ]);
+
+  const [variants, categories] = await Promise.all([
+    ProductVariantModel.find({ productId: { $in: products.map((product) => product._id) }, isActive: true })
+      .sort({ sortOrder: 1, createdAt: 1 })
+      .lean(),
+    CategoryModel.find({ _id: { $in: products.flatMap((product) => product.categoryIds) } }).lean()
+  ]);
+  const inventories = await InventoryModel.find({ variantId: { $in: variants.map((variant) => variant._id) } }).lean();
+  const inventoryByVariant = new Map(inventories.map((inventory) => [inventory.variantId.toString(), inventory]));
+  const categoriesById = new Map(categories.map((category) => [category._id.toString(), category]));
+  const variantsByProduct = new Map<string, typeof variants>();
+  for (const variant of variants) {
+    const productId = variant.productId.toString();
+    variantsByProduct.set(productId, [...(variantsByProduct.get(productId) ?? []), variant]);
+  }
+
+  const items = products.map((product) => ({
+    ...product,
+    categories: product.categoryIds.map((id) => categoriesById.get(id.toString())).filter(Boolean).map((category) => ({
+      id: category!._id.toString(),
+      name: category!.name,
+      slug: category!.slug
+    })),
+    variants: (variantsByProduct.get(product._id.toString()) ?? []).map((variant) => ({
+      ...variant,
+      inventory: product.isOutOfStock
+        ? { ...(inventoryByVariant.get(variant._id.toString()) ?? { available: 0 }), available: 0 }
+        : inventoryByVariant.get(variant._id.toString()) ?? null
+    }))
+  }));
 
   return {
     items,
@@ -465,12 +526,10 @@ export const getPublicProductBySlug = async (slug: string) => {
     throw new Error("Product not found");
   }
 
-  const variants = await ProductVariantModel.find({
-    productId: product._id,
-    isActive: true
-  })
-    .sort({ sortOrder: 1, createdAt: 1 })
-    .lean();
+  const [variants, categories] = await Promise.all([
+    ProductVariantModel.find({ productId: product._id, isActive: true }).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+    CategoryModel.find({ _id: { $in: product.categoryIds }, isVisible: true }).lean()
+  ]);
 
   const inventories = await InventoryModel.find({
     variantId: { $in: variants.map((v) => v._id) }
@@ -482,9 +541,16 @@ export const getPublicProductBySlug = async (slug: string) => {
 
   return {
     ...product,
+    categories: categories.map((category) => ({
+      id: category._id.toString(),
+      name: category.name,
+      slug: category.slug
+    })),
     variants: variants.map((variant) => ({
       ...variant,
-      inventory: inventoryByVariant.get(variant._id.toString()) ?? null
+      inventory: product.isOutOfStock
+        ? { ...(inventoryByVariant.get(variant._id.toString()) ?? { available: 0 }), available: 0 }
+        : inventoryByVariant.get(variant._id.toString()) ?? null
     }))
   };
 };

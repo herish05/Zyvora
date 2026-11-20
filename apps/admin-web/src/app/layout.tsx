@@ -3,8 +3,8 @@ import { AdminShell } from "./admin-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Zyvora Control Center",
-  description: "Admin operations for Zyvora"
+  title: "Zyvora Studio | Admin",
+  description: "Manage the Zyvora catalog, inventory, and business profile."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

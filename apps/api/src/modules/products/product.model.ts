@@ -17,6 +17,8 @@ export interface ProductDoc {
   tags: string[];
   categoryIds: Types.ObjectId[];
   publicationStatus: PublicationStatus;
+  isOutOfStock: boolean;
+  isBestSeller: boolean;
   publishedAt?: Date;
   scheduledAt?: Date;
   seoTitle?: string;
@@ -51,6 +53,8 @@ const productSchema = new Schema<ProductDoc>(
       default: "draft",
       index: true
     },
+    isOutOfStock: { type: Boolean, default: false, index: true },
+    isBestSeller: { type: Boolean, default: false, index: true },
     publishedAt: { type: Date },
     scheduledAt: { type: Date },
     seoTitle: { type: String },

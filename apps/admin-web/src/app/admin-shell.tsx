@@ -2,123 +2,148 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { ADMIN_SESSION_EXPIRED_EVENT, apiRequest, clearStoredAdminToken, ensureActiveAdminToken } from "../lib/api";
+import {
+  ChevronRight,
+  CircleHelp,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Package,
+  Settings2,
+  ShoppingBag,
+  Tags,
+  Users,
+  X
+} from "lucide-react";
 
-const navItems: Array<{ label: string; href: string; short: string }> = [
-  { label: "Dashboard", href: "/dashboard", short: "DB" },
-  { label: "Categories", href: "/categories", short: "CT" },
-  { label: "Products", href: "/products", short: "PR" },
-  { label: "Orders", href: "/orders", short: "OR" },
-  { label: "Customers", href: "/customers", short: "CU" },
-  { label: "Settings", href: "/settings", short: "ST" }
+const navItems = [
+  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Products", href: "/products", icon: Package },
+  { label: "Categories", href: "/categories", icon: Tags },
+  { label: "Orders", href: "/orders", icon: ShoppingBag },
+  { label: "Customers", href: "/customers", icon: Users },
+  { label: "Settings", href: "/settings", icon: Settings2 }
 ];
 
-const isAuthPage = (pathname: string) =>
-  pathname === "/signin" || pathname.startsWith("/auth/");
-
-const workflowPathToStep = (pathname: string) => {
-  if (pathname.startsWith("/categories")) return 1;
-  if (pathname.startsWith("/products/new")) return 2;
-  if (pathname.startsWith("/products")) return 3;
-  if (pathname.startsWith("/orders")) return 4;
-  return 1;
-};
+const isAuthPage = (pathname: string) => pathname === "/signin" || pathname === "/setup" || pathname.startsWith("/auth/");
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  if (isAuthPage(pathname)) {
-    return <>{children}</>;
-  }
+  useEffect(() => {
+    const closeMenu = () => {
+      if (window.innerWidth >= 1024) setMobileMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("resize", closeMenu);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("resize", closeMenu);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
 
-  const currentStep = useMemo(() => workflowPathToStep(pathname), [pathname]);
-  const progressPercent = Math.round((currentStep / 4) * 100);
+  useEffect(() => setMobileMenuOpen(false), [pathname]);
 
-  const onSignOut = () => {
-    window.localStorage.removeItem("zyvora_admin_access_token");
-    window.localStorage.removeItem("zyvora_access_token");
-    router.push("/signin");
+  useEffect(() => {
+    if (isAuthPage(pathname)) return;
+    let isCurrent = true;
+    ensureActiveAdminToken().then((token) => {
+      if (isCurrent && !token) {
+        router.replace(`/signin?next=${encodeURIComponent(pathname || "/dashboard")}`);
+      }
+    });
+    return () => { isCurrent = false; };
+  }, [pathname, router]);
+
+  useEffect(() => {
+    const onSessionExpired = () => {
+      router.replace(`/signin?expired=1&next=${encodeURIComponent(pathname || "/dashboard")}`);
+    };
+    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, onSessionExpired);
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, onSessionExpired);
+  }, [pathname, router]);
+
+  if (isAuthPage(pathname)) return <>{children}</>;
+
+  const onSignOut = async () => {
+    try {
+      await apiRequest("/auth/signout", { method: "POST" });
+    } catch {
+      // Local sign-out still works when the API cannot revoke the refresh cookie.
+    }
+    clearStoredAdminToken();
+    router.replace("/signin");
   };
+
+  const nav = (mobile = false) => (
+    <nav className="admin-nav" aria-label="Admin navigation">
+      {navItems.map(({ label, href, icon: Icon }) => {
+        const active = pathname === href || pathname.startsWith(`${href}/`);
+        return (
+          <Link key={href} href={href} className={`admin-nav-link ${active ? "admin-nav-link-active" : ""}`}>
+            <Icon size={18} strokeWidth={1.8} />
+            <span>{label}</span>
+            {active && !mobile ? <ChevronRight size={15} className="ml-auto opacity-60" /> : null}
+          </Link>
+        );
+      })}
+    </nav>
+  );
 
   return (
     <div className="admin-shell min-h-screen">
-      <aside className={`admin-sidebar hidden md:flex ${collapsed ? "admin-sidebar-collapsed" : ""}`}>
-        <div className="flex items-start justify-between gap-2">
-          <p className="admin-sidebar-kicker">Zyvora</p>
-          <button
-            type="button"
-            className="admin-collapse-btn"
-            onClick={() => setCollapsed((prev) => !prev)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? ">" : "<"}
-          </button>
-        </div>
-        <h1 className={`admin-sidebar-title ${collapsed ? "hidden" : ""}`} style={{ fontFamily: "var(--font-display)" }}>
-          Control Center
-        </h1>
-
-        <nav className="mt-8 flex flex-col gap-2">
-          {navItems.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`admin-nav-item ${active ? "admin-nav-item-active" : ""}`}
-                title={item.label}
-              >
-                <span className="admin-nav-icon">{item.short}</span>
-                {!collapsed ? <span>{item.label}</span> : null}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className={`mt-6 rounded-xl border border-[#dce2e8] bg-white/70 p-3 ${collapsed ? "hidden" : ""}`}>
-          <p className="text-[11px] uppercase tracking-[0.15em] text-[#5b6470]">Workflow Progress</p>
-          <p className="mt-1 text-sm font-medium text-[#0f172a]">Step {currentStep} of 4</p>
-          <div className="mt-2 h-2 rounded-full bg-[#ebeff2]">
-            <div className="h-2 rounded-full bg-[#1f3a33]" style={{ width: `${progressPercent}%` }} />
+      <aside className="admin-sidebar hidden lg:flex">
+        <Link href="/dashboard" className="admin-brand">
+          <span className="admin-brand-mark">Z</span>
+          <span><strong>Zyvora</strong><small>STUDIO / ADMIN</small></span>
+        </Link>
+        <p className="admin-nav-caption">WORKSPACE</p>
+        {nav()}
+        <div className="admin-sidebar-bottom">
+          <div className="admin-help-card">
+            <span className="admin-help-icon"><CircleHelp size={17} /></span>
+            <p>Need a hand?</p>
+            <span>Keep your catalog looking lovely and up to date.</span>
           </div>
-        </div>
-
-        <div className="mt-auto">
-          <button className="admin-signout-btn" onClick={onSignOut} type="button">
-            {collapsed ? "SO" : "Sign out"}
-          </button>
+          <button type="button" onClick={onSignOut} className="admin-signout"><LogOut size={17} /> Sign out</button>
+          <p className="admin-sidebar-foot">ZYVORA · CONTROL CENTER</p>
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1">
-        <header className="admin-topbar md:hidden">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[#5b6470]">Zyvora</p>
-            <p className="text-base font-semibold">Control Center</p>
+      <div className="admin-main min-w-0 flex-1">
+        <header className="admin-topbar">
+          <div className="admin-topbar-inner">
+            <button type="button" onClick={() => setMobileMenuOpen(true)} className="admin-menu-button flex lg:hidden" aria-label="Open navigation"><Menu size={20} /></button>
+            <div className="min-w-0">
+              <p className="admin-breadcrumb">Zyvora <span>/</span> {navItems.find((item) => pathname.startsWith(item.href))?.label ?? "Workspace"}</p>
+              <p className="admin-topbar-title">Good things happen when you’re organized.</p>
             </div>
-            <button className="admin-signout-btn w-auto px-3 py-1.5" onClick={onSignOut} type="button">Sign out</button>
+            <div className="admin-topbar-right">
+              <span className="admin-store-status"><span /> Admin workspace</span>
+              <span className="admin-avatar" aria-label="Admin account">A</span>
+            </div>
           </div>
         </header>
+        <div className="admin-page-content">{children}</div>
+      </div>
 
-        <nav className="admin-mobile-nav w-full md:hidden">
-          {navItems.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`admin-mobile-nav-item ${active ? "admin-mobile-nav-item-active" : ""}`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div>{children}</div>
+      <div className={`admin-mobile-backdrop ${mobileMenuOpen ? "admin-mobile-backdrop-open" : ""}`} onClick={() => setMobileMenuOpen(false)} aria-hidden={!mobileMenuOpen}>
+        <aside className={`admin-mobile-drawer ${mobileMenuOpen ? "admin-mobile-drawer-open" : ""}`} onClick={(event) => event.stopPropagation()}>
+          <div className="flex items-center justify-between">
+            <Link href="/dashboard" className="admin-brand"><span className="admin-brand-mark">Z</span><span><strong>Zyvora</strong><small>STUDIO / ADMIN</small></span></Link>
+            <button type="button" className="admin-menu-button flex" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation"><X size={19} /></button>
+          </div>
+          <p className="admin-nav-caption">WORKSPACE</p>
+          {nav(true)}
+          <button type="button" onClick={onSignOut} className="admin-signout mt-auto"><LogOut size={17} /> Sign out</button>
+        </aside>
       </div>
     </div>
   );

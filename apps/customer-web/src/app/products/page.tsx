@@ -4,13 +4,12 @@ import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Star } from "lucide-react";
-import { mockProducts } from "../../lib/mock-catalog";
+import { mockProducts, type MockProduct } from "../../lib/mock-catalog";
+import { getStorefrontProducts } from "../../lib/storefront-catalog";
 import { upsertMockCartItem } from "../../lib/mock-cart";
 import { MOCK_WISHLIST_UPDATED_EVENT, readMockWishlistStorage, upsertMockWishlistItem } from "../../lib/mock-wishlist";
 import { AppToast, useAppToast } from "../../components/app-toast";
 import { announceCatalogCategory, readCatalogCategory } from "../../lib/catalog-navigation";
-
-const categoryTabs = ["all", "shoes", "shirts", "jeans", "purse"] as const;
 
 export default function ProductListingPage() {
   return (
@@ -24,7 +23,8 @@ function ProductListingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedCategory = searchParams.get("category");
-  const [activeCategory, setActiveCategory] = useState<(typeof categoryTabs)[number]>("all");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [catalogProducts, setCatalogProducts] = useState<MockProduct[]>(process.env.NODE_ENV === "production" ? [] : mockProducts);
   const [searchText, setSearchText] = useState("");
   const [sortBy, setSortBy] = useState<"popular" | "price_low" | "price_high" | "rating">("popular");
   const [page, setPage] = useState(1);
@@ -45,25 +45,38 @@ function ProductListingContent() {
   const [isGridLoading, setIsGridLoading] = useState(true);
   const hasHydratedRef = useRef(false);
 
+  const categoryTabs = useMemo(() => ["all", ...Array.from(new Set(catalogProducts.map((product) => product.categorySlug || product.category)))], [catalogProducts]);
+  const categoryLabel = (category: string) => category === "all"
+    ? "All"
+    : catalogProducts.find((product) => (product.categorySlug || product.category) === category)?.categoryName || category.replace(/[-_]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  useEffect(() => {
+    let isCurrent = true;
+    getStorefrontProducts().then((products) => {
+      if (isCurrent) setCatalogProducts(products ?? (process.env.NODE_ENV === "production" ? [] : mockProducts));
+    });
+    return () => { isCurrent = false; };
+  }, []);
+
   const priceCeiling = useMemo(() => {
-    const highest = mockProducts.reduce((max, product) => {
+    const highest = catalogProducts.reduce((max, product) => {
       const productMax = product.variants.reduce((variantMax, variant) => Math.max(variantMax, variant.priceMinor), 0);
       return Math.max(max, productMax);
     }, 0);
     return highest > 0 ? highest : 100000;
-  }, []);
+  }, [catalogProducts]);
   const [maxPriceMinor, setMaxPriceMinor] = useState(priceCeiling);
 
-  const brands = useMemo(() => Array.from(new Set(mockProducts.map((product) => product.brand))).sort(), []);
+  const brands = useMemo(() => Array.from(new Set(catalogProducts.map((product) => product.brand))).sort(), [catalogProducts]);
 
   const minPriceBySlug = useMemo(() => {
     const map = new Map<string, number>();
-    for (const product of mockProducts) {
+    for (const product of catalogProducts) {
       const min = product.variants.reduce((acc, variant) => Math.min(acc, variant.priceMinor), Number.MAX_SAFE_INTEGER);
       map.set(product.slug, min);
     }
     return map;
-  }, []);
+  }, [catalogProducts]);
 
   useEffect(() => {
     const category = readCatalogCategory(requestedCategory);
@@ -72,7 +85,7 @@ function ProductListingContent() {
     announceCatalogCategory(category);
   }, [requestedCategory]);
 
-  const selectCategory = (category: (typeof categoryTabs)[number]) => {
+  const selectCategory = (category: string) => {
     setActiveCategory(category);
     setPage(1);
     announceCatalogCategory(category);
@@ -126,8 +139,8 @@ function ProductListingContent() {
   const filteredProducts = useMemo(() => {
     const query = searchText.trim().toLowerCase();
 
-    const filtered = mockProducts.filter((product) => {
-      const categoryMatch = activeCategory === "all" ? true : product.category === activeCategory;
+    const filtered = catalogProducts.filter((product) => {
+      const categoryMatch = activeCategory === "all" ? true : (product.categorySlug || product.category) === activeCategory;
       const queryMatch = query
         ? [product.name, product.brand, product.shortDescription].join(" ").toLowerCase().includes(query)
         : true;
@@ -150,19 +163,13 @@ function ProductListingContent() {
     });
 
     return sorted;
-  }, [activeCategory, searchText, sortBy, selectedBrands, minRating, onlyInStock, maxPriceMinor, minPriceBySlug]);
+  }, [catalogProducts, activeCategory, searchText, sortBy, selectedBrands, minRating, onlyInStock, maxPriceMinor, minPriceBySlug]);
 
   const categoryCounts = useMemo(() => {
     const query = searchText.trim().toLowerCase();
-    const counts: Record<(typeof categoryTabs)[number], number> = {
-      all: 0,
-      shoes: 0,
-      shirts: 0,
-      jeans: 0,
-      purse: 0
-    };
+    const counts = new Map<string, number>(categoryTabs.map((category) => [category, 0]));
 
-    for (const product of mockProducts) {
+    for (const product of catalogProducts) {
       const queryMatch = query
         ? [product.name, product.brand, product.shortDescription].join(" ").toLowerCase().includes(query)
         : true;
@@ -175,22 +182,23 @@ function ProductListingContent() {
         continue;
       }
 
-      counts.all += 1;
-      counts[product.category] += 1;
+      counts.set("all", (counts.get("all") ?? 0) + 1);
+      const category = product.categorySlug || product.category;
+      counts.set(category, (counts.get(category) ?? 0) + 1);
     }
 
     return counts;
-  }, [searchText, selectedBrands, minRating, onlyInStock, maxPriceMinor, minPriceBySlug]);
+  }, [catalogProducts, categoryTabs, searchText, selectedBrands, minRating, onlyInStock, maxPriceMinor, minPriceBySlug]);
 
   const brandCounts = useMemo(() => {
     const query = searchText.trim().toLowerCase();
     const counts = new Map<string, number>();
 
-    for (const product of mockProducts) {
+    for (const product of catalogProducts) {
       const queryMatch = query
         ? [product.name, product.brand, product.shortDescription].join(" ").toLowerCase().includes(query)
         : true;
-      const categoryMatch = activeCategory === "all" ? true : product.category === activeCategory;
+      const categoryMatch = activeCategory === "all" ? true : (product.categorySlug || product.category) === activeCategory;
       const ratingMatch = product.rating >= minRating;
       const stockMatch = onlyInStock ? product.variants.some((variant) => variant.inStock) : true;
       const priceMatch = (minPriceBySlug.get(product.slug) ?? 0) <= maxPriceMinor;
@@ -203,7 +211,7 @@ function ProductListingContent() {
     }
 
     return counts;
-  }, [searchText, activeCategory, minRating, onlyInStock, maxPriceMinor, minPriceBySlug]);
+  }, [catalogProducts, searchText, activeCategory, minRating, onlyInStock, maxPriceMinor, minPriceBySlug]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -217,7 +225,7 @@ function ProductListingContent() {
         <input
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
-          placeholder="Search shoes, shirts, jeans, purse"
+          placeholder="Search products, brands, and styles"
           className="w-full rounded-xl border border-[#d8c8b0] bg-white px-4 py-2.5"
         />
         <button className="rounded-full bg-[#162e36] px-5 py-2.5 text-white sm:self-auto">Search</button>
@@ -261,7 +269,7 @@ function ProductListingContent() {
                 : "border border-[#d8c8b0] bg-white text-[#5f5a52]"
             }`}
           >
-            {category === "all" ? "All" : category.charAt(0).toUpperCase() + category.slice(1)}
+            {categoryLabel(category)}
           </button>
         ))}
       </div>
@@ -308,8 +316,8 @@ function ProductListingContent() {
                       activeCategory === category ? "bg-[#162e36] text-white" : "bg-[#fff] text-[#2f2a24]"
                     }`}
                   >
-                    <span>{category === "all" ? "All categories" : category.charAt(0).toUpperCase() + category.slice(1)}</span>
-                    <span className={`text-xs ${activeCategory === category ? "text-white/80" : "text-[#7e5112]"}`}>({categoryCounts[category]})</span>
+                    <span>{category === "all" ? "All categories" : categoryLabel(category)}</span>
+            <span className={`text-xs ${activeCategory === category ? "text-white/80" : "text-[#7e5112]"}`}>({categoryCounts.get(category) ?? 0})</span>
                   </button>
                 ))}
               </div>
@@ -454,16 +462,18 @@ function ProductListingContent() {
             return (
               <article key={product.id} className="card-premium glow-hover overflow-hidden">
                 <Link href={`/products/${product.slug}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={product.images[0]} alt={product.name} className="h-44 w-full object-cover" />
+                  {product.images[0] ? <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={product.images[0]} alt={product.name} className="h-44 w-full object-cover" />
+                  </> : <div className="flex h-44 items-center justify-center bg-[#f4e9e4] text-xs text-[#907a72]">Product photo</div>}
                 </Link>
                 <div className="p-4">
                   <p className="text-xs uppercase tracking-[0.12em] text-[#7e5112]">{product.brand}</p>
-                  <h3 className="mt-1 text-xl" style={{ fontFamily: "var(--font-display)" }}>{product.name}</h3>
+                  <div className="mt-1 flex items-center justify-between gap-2"><h3 className="text-xl" style={{ fontFamily: "var(--font-display)" }}>{product.name}</h3>{product.isBestSeller ? <span className="shrink-0 rounded-full bg-[#f7ece7] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-[#8e5552]">Bestseller</span> : null}</div>
                   <p className="mt-1 text-sm text-[#5f5a52] line-clamp-2">{product.shortDescription}</p>
                   <div className="mt-3 flex items-center justify-between">
                     <p className="font-semibold">₹{(((baseVariant?.priceMinor ?? 0) / 100)).toLocaleString("en-IN")}</p>
-                    <p className="inline-flex items-center gap-1 text-sm text-[#5f5a52]"><Star size={14} /> {product.rating}</p>
+                  {product.reviewCount > 0 ? <p className="inline-flex items-center gap-1 text-sm text-[#5f5a52]"><Star size={14} /> {product.rating}</p> : null}
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link href={`/products/${product.slug}`} className="inline-flex rounded-full border border-[#1b1b1b] px-3 py-1 text-xs">View details</Link>

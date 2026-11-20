@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Star } from "lucide-react";
-import { getMockProductBySlug, getMockSimilarProducts, mockProducts } from "../../../lib/mock-catalog";
+import { getMockProductBySlug, getMockSimilarProducts, type MockProduct } from "../../../lib/mock-catalog";
+import { getStorefrontProduct } from "../../../lib/storefront-catalog";
 import { hasMockWishlistItem, MOCK_WISHLIST_UPDATED_EVENT, toggleMockWishlistItem } from "../../../lib/mock-wishlist";
 import { upsertMockCartItem } from "../../../lib/mock-cart";
 import { AppToast, useAppToast } from "../../../components/app-toast";
@@ -21,7 +22,7 @@ export default function ProductDetailDynamicPage() {
   const router = useRouter();
   const slug = String(params.slug ?? "");
 
-  const product = useMemo(() => getMockProductBySlug(slug) ?? mockProducts.at(0) ?? null, [slug]);
+  const [product, setProduct] = useState<MockProduct | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState("");
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -31,12 +32,17 @@ export default function ProductDetailDynamicPage() {
 
   useEffect(() => {
     setIsPageLoading(true);
-    const timer = window.setTimeout(() => {
+    let isCurrent = true;
+    getStorefrontProduct(slug).then((storeProduct) => {
+      if (!isCurrent) return;
+      const resolvedProduct = storeProduct ?? (process.env.NODE_ENV === "production" ? null : getMockProductBySlug(slug));
+      setProduct(resolvedProduct);
+      setSelectedVariantId(resolvedProduct?.variants[0]?.id ?? "");
+      setSelectedMediaIndex(0);
       setIsPageLoading(false);
-    }, 220);
-
+    });
     return () => {
-      window.clearTimeout(timer);
+      isCurrent = false;
     };
   }, [slug]);
 
@@ -68,7 +74,7 @@ export default function ProductDetailDynamicPage() {
   const activeVariantId = selectedVariantId || product.variants.at(0)?.id || "";
 
   const addToCart = async () => {
-    if (!selectedVariantId) {
+    if (!activeVariantId) {
       setError("Please select a variant");
       return;
     }
@@ -76,6 +82,10 @@ export default function ProductDetailDynamicPage() {
     const selectedVariant = product.variants.find((variant) => variant.id === activeVariantId);
     if (!selectedVariant) {
       setError("Selected variant unavailable");
+      return;
+    }
+    if (!selectedVariant.inStock) {
+      setError("This option is currently out of stock.");
       return;
     }
 
@@ -134,8 +144,9 @@ export default function ProductDetailDynamicPage() {
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
         <p className="text-xs uppercase tracking-[0.14em] text-[#7e5112]">{product.brand}</p>
         <h1 className="mt-2 text-3xl leading-tight sm:text-4xl" style={{ fontFamily: "var(--font-display)" }}>{product.name}</h1>
+        {product.categoryName ? <p className="mt-2 text-xs text-[#8b756d]">{product.categoryName}</p> : null}
         {selectedVariant ? <p className="mt-2 text-sm text-[#5f5a52]">Variant: {selectedVariant.label}</p> : null}
-        <p className="mt-2 inline-flex items-center gap-1 text-sm text-[#5f5a52]"><Star size={14} /> {product.rating} ({product.reviewCount} reviews)</p>
+        {product.reviewCount > 0 ? <p className="mt-2 inline-flex items-center gap-1 text-sm text-[#5f5a52]"><Star size={14} /> {product.rating} ({product.reviewCount} reviews)</p> : null}
         {selectedVariant ? <p className="mt-4 text-2xl font-semibold">{formatMinor(selectedVariant.priceMinor, selectedVariant.currency ?? "INR")}</p> : null}
         {selectedVariant?.compareAtMinor ? (
           <p className="text-sm text-[#5f5a52] line-through">{formatMinor(selectedVariant.compareAtMinor, selectedVariant.currency ?? "INR")}</p>
@@ -163,7 +174,7 @@ export default function ProductDetailDynamicPage() {
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <button className="rounded-full bg-[#1b1b1b] px-5 py-2.5 text-white" onClick={addToCart} type="button">Add to Cart</button>
+          <button className="rounded-full bg-[#1b1b1b] px-5 py-2.5 text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={addToCart} type="button" disabled={!selectedVariant?.inStock}>Add to Cart</button>
           <button
             className={`rounded-full px-5 py-2.5 ${
               isInWishlist ? "border border-[#c86f1b] bg-[#fff3e4] text-[#9a4f06]" : "border border-[#1b1b1b]"
@@ -178,7 +189,10 @@ export default function ProductDetailDynamicPage() {
       </section>
       </div>
 
-      <section className="card-premium mt-6 p-5 sm:p-6">
+      {product.description ? <section className="card-premium mt-6 p-5 sm:p-6"><h2 className="text-2xl" style={{ fontFamily: "var(--font-display)" }}>About this product</h2><p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#5f5a52]">{product.description}</p></section> : null}
+      {product.highlights.length ? <section className="card-premium mt-6 p-5 sm:p-6"><h2 className="text-2xl" style={{ fontFamily: "var(--font-display)" }}>Product highlights</h2><ul className="mt-3 grid gap-2 sm:grid-cols-2">{product.highlights.map((highlight) => <li key={highlight} className="rounded-xl border border-[#eadfce] bg-white px-4 py-3 text-sm text-[#5f5a52]">{highlight}</li>)}</ul></section> : null}
+
+      {product.specifications.length ? <section className="card-premium mt-6 p-5 sm:p-6">
         <h2 className="text-2xl" style={{ fontFamily: "var(--font-display)" }}>Specifications</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {product.specifications.map((spec) => (
@@ -188,9 +202,9 @@ export default function ProductDetailDynamicPage() {
             </div>
           ))}
         </div>
-      </section>
+      </section> : null}
 
-      <section className="card-premium mt-6 p-5 sm:p-6">
+      {product.reviews.length ? <section className="card-premium mt-6 p-5 sm:p-6">
         <h2 className="text-2xl" style={{ fontFamily: "var(--font-display)" }}>Customer Reviews</h2>
         <div className="mt-4 space-y-4">
           {product.reviews.map((review) => (
@@ -209,7 +223,7 @@ export default function ProductDetailDynamicPage() {
             </article>
           ))}
         </div>
-      </section>
+      </section> : null}
 
       <section className="mt-6">
         <div className="mb-4 flex items-center justify-between">

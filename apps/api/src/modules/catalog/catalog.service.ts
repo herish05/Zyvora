@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { AttributeDefinitionModel } from "./attribute-definition.model.js";
 import { CategoryModel } from "./category.model.js";
+import { ProductModel } from "../products/product.model.js";
 import type {
   CreateAttributeDefinitionInput,
   CreateCategoryInput,
@@ -168,6 +169,23 @@ export const updateCategory = async (id: string, input: UpdateCategoryInput) => 
 
   await category.save();
   return category;
+};
+
+export const deleteCategory = async (id: string) => {
+  const category = await CategoryModel.findById(id);
+  if (!category) throw new Error("Category not found");
+  const [productCount, childCount] = await Promise.all([
+    ProductModel.countDocuments({ categoryIds: category._id }),
+    CategoryModel.countDocuments({ parentCategoryId: category._id })
+  ]);
+  if (productCount) throw new Error("Move or remove products from this category before deleting it");
+  if (childCount) throw new Error("Move or delete child categories before deleting this category");
+  await AttributeDefinitionModel.updateMany(
+    { appliesToCategoryIds: category._id },
+    { $pull: { appliesToCategoryIds: category._id } }
+  );
+  await category.deleteOne();
+  return { id };
 };
 
 export const listAdminCategories = async () =>

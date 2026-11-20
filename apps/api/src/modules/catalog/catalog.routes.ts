@@ -12,6 +12,7 @@ import {
 import {
   createAttributeDefinition,
   createCategory,
+  deleteCategory,
   getCategoryFilterDefinitions,
   listAdminCategories,
   listAttributeDefinitions,
@@ -60,6 +61,16 @@ catalogRouter.put("/admin/categories/:id", requireAuth, requireRoles("admin"), a
     res.json(success("Category updated", category));
   } catch (error) {
     res.status(400).json(failure("Category update failed", error));
+  }
+});
+
+catalogRouter.delete("/admin/categories/:id", requireAuth, requireRoles("admin"), async (req, res) => {
+  try {
+    const { id } = idParamSchema.parse(req.params);
+    const result = await deleteCategory(id);
+    res.json(success("Category deleted", result));
+  } catch (error) {
+    res.status(400).json(failure("Category deletion failed", error));
   }
 });
 

@@ -1,6 +1,7 @@
 export type MockReview = {
   id: string;
   name: string;
+  isBestSeller?: boolean;
   rating: number;
   title: string;
   comment: string;
@@ -21,7 +22,9 @@ export type MockVariant = {
 export type MockProduct = {
   id: string;
   slug: string;
-  category: "shoes" | "shirts" | "jeans" | "purse";
+  category: string;
+  categoryName?: string;
+  categorySlug?: string;
   name: string;
   brand: string;
   shortDescription: string;

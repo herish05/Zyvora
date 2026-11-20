@@ -69,7 +69,7 @@ const buildCartView = async (cart: Awaited<ReturnType<typeof getOrCreateCart>>) 
         unitPriceMinor: variant.priceMinor,
         lineSubtotalMinor,
         availableStock: inventory?.available ?? 0,
-        inStock: (inventory?.available ?? 0) >= item.quantity,
+        inStock: !product?.isOutOfStock && (inventory?.available ?? 0) >= item.quantity,
         product: product
           ? {
               id: product._id.toString(),
@@ -107,6 +107,11 @@ const ensureVariantForCart = async (variantId: string, quantity: number) => {
   const inventory = await InventoryModel.findOne({ variantId: variant._id });
   if (!inventory) {
     throw new Error("Inventory record not found for variant");
+  }
+
+  const product = await ProductModel.findById(variant.productId).select("isOutOfStock publicationStatus").lean();
+  if (!product || product.publicationStatus !== "published" || product.isOutOfStock) {
+    throw new Error("This product is currently unavailable");
   }
 
   if (inventory.available < quantity) {
